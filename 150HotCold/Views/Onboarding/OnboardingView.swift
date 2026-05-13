@@ -52,11 +52,18 @@ struct OnboardingView: View {
                         content: { page3Visual }
                     )
                     .tag(2)
+
+                    onboardingPage(
+                        title: "Program & Academy",
+                        message: "Equilibrium Path is a five-level curriculum with measurable rules. Academy teaches the 150HotCold method in six short reads — optional, but built in.",
+                        content: { page4Visual }
+                    )
+                    .tag(3)
                 }
                 .tabViewStyle(.page(indexDisplayMode: .always))
 
                 VStack(spacing: 12) {
-                    if page < 2 {
+                    if page < 3 {
                         Button("Next") {
                             withAnimation(.easeInOut(duration: 0.28)) {
                                 page += 1
@@ -223,6 +230,23 @@ struct OnboardingView: View {
                     LinearGradient(colors: [Color.yellow.opacity(0.95), Color.orange.opacity(0.7)], startPoint: .topLeading, endPoint: .bottomTrailing)
                 )
                 .shadow(color: Color.orange.opacity(0.35), radius: 10, y: 4)
+        }
+    }
+
+    private var page4Visual: some View {
+        HStack(spacing: 24) {
+            Image(systemName: "point.3.connected.trianglepath.dotted")
+                .font(.system(size: 40))
+                .foregroundStyle(
+                    LinearGradient(colors: [Color.hcHot, Color.orange.opacity(0.8)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                )
+                .shadow(color: Color.hcHot.opacity(0.4), radius: 10, y: 4)
+            Image(systemName: "book.pages.fill")
+                .font(.system(size: 40))
+                .foregroundStyle(
+                    LinearGradient(colors: [Color.hcCold, Color.cyan.opacity(0.75)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                )
+                .shadow(color: Color.hcCold.opacity(0.35), radius: 10, y: 4)
         }
     }
 }

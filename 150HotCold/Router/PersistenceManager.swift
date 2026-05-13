@@ -1,63 +1,50 @@
 //
 //  PersistenceManager.swift
-//  101RoastLog
-//
-//  Created by Ethit Hu on 19.03.2026.
+//  150HotCold
 //
 
 import Foundation
 
-class PersistenceManager {
-    static let shared = PersistenceManager()
-    
-    private let savedUrlKey = "LastUrl"
-    private let hasShownContentViewKey = "HasShownContentView"
-    private let hasSuccessfulWebViewLoadKey = "HasSuccessfulWebViewLoad"
-    
+final class HCLaunchStateVault {
+    static let shared = HCLaunchStateVault()
+
     var savedUrl: String? {
         get {
-            // Синхронизация с SaveService для обратной совместимости
-            if let url = SaveService.lastUrl {
+            if let url = HCDefaultsURLRelay.lastUrl {
                 return url.absoluteString
             }
-            return UserDefaults.standard.string(forKey: savedUrlKey)
+            return UserDefaults.standard.string(forKey: HCRouterStringVault.udLastUrlKey)
         }
         set {
             if let urlString = newValue {
-                print("💾 [LastUrl] WRITE UserDefaults key=\(savedUrlKey) url=\(urlString)")
-                UserDefaults.standard.set(urlString, forKey: savedUrlKey)
-                // Синхронизация с SaveService
+                UserDefaults.standard.set(urlString, forKey: HCRouterStringVault.udLastUrlKey)
                 if let url = URL(string: urlString) {
-                    SaveService.lastUrl = url
-                    print("💾 [LastUrl] SYNC SaveService (URL) = \(url.absoluteString)")
-                } else {
-                    print("⚠️ [LastUrl] SKIP SaveService sync — invalid URL string")
+                    HCDefaultsURLRelay.lastUrl = url
                 }
             } else {
-                print("💾 [LastUrl] CLEAR UserDefaults key=\(savedUrlKey) + SaveService")
-                UserDefaults.standard.removeObject(forKey: savedUrlKey)
-                SaveService.lastUrl = nil
+                UserDefaults.standard.removeObject(forKey: HCRouterStringVault.udLastUrlKey)
+                HCDefaultsURLRelay.lastUrl = nil
             }
         }
     }
-    
+
     var hasShownContentView: Bool {
         get {
-            UserDefaults.standard.bool(forKey: hasShownContentViewKey)
+            UserDefaults.standard.bool(forKey: HCRouterStringVault.udHasShownContentViewKey)
         }
         set {
-            UserDefaults.standard.set(newValue, forKey: hasShownContentViewKey)
+            UserDefaults.standard.set(newValue, forKey: HCRouterStringVault.udHasShownContentViewKey)
         }
     }
-    
+
     var hasSuccessfulWebViewLoad: Bool {
         get {
-            UserDefaults.standard.bool(forKey: hasSuccessfulWebViewLoadKey)
+            UserDefaults.standard.bool(forKey: HCRouterStringVault.udHasSuccessfulWebViewLoadKey)
         }
         set {
-            UserDefaults.standard.set(newValue, forKey: hasSuccessfulWebViewLoadKey)
+            UserDefaults.standard.set(newValue, forKey: HCRouterStringVault.udHasSuccessfulWebViewLoadKey)
         }
     }
-    
+
     private init() {}
 }

@@ -23,12 +23,19 @@ final class HotColdViewModel: ObservableObject {
     /// When balance is below −this value, warn. 0 = off.
     @Published var maxColdLeadBeforeWarning: Int = 2
 
+    @Published var rhythmMode: EquilibriumRhythmMode = .freePlay
+    @Published private(set) var completedEquilibriumLevelIds: Set<String> = []
+    @Published private(set) var readAcademyLessonIds: Set<String> = []
+
     private let habitsKey = "hotcold_habits"
     private let logsKey = "hotcold_logs"
     private let streaksKey = "hotcold_streaks"
     private let dayNotesKey = "hotcold_day_notes"
     private let achievementsKey = "hotcold_achievements"
     private let settingsKey = "hotcold_settings"
+    private let rhythmModeKey = "hotcold_rhythm_mode"
+    private let pathLevelsKey = "hotcold_path_completed_levels"
+    private let academyReadKey = "hotcold_academy_read"
 
     private struct PersistedSettings: Codable {
         var maxHotLead: Int
@@ -150,6 +157,9 @@ final class HotColdViewModel: ObservableObject {
     }
 
     var dailyHint: String {
+        if rhythmMode == .recoveryBias {
+            return recoveryBiasDailyHint
+        }
         let y = yesterdayBalance
         let cal = Calendar.current
         let yDate = cal.date(byAdding: .day, value: -1, to: Date()).map { cal.startOfDay(for: $0) } ?? Date()
@@ -167,6 +177,17 @@ final class HotColdViewModel: ObservableObject {
             return "Yesterday was balanced. Keep alternating effort and recovery."
         }
         return "Check in with how you feel and adjust today’s mix."
+    }
+
+    private var recoveryBiasDailyHint: String {
+        let b = todayBalance
+        if b > 1 {
+            return "Recovery bias: score is still hot-heavy — anchor one cold ritual before stacking more hot wins."
+        }
+        if b >= -1, b <= 1 {
+            return "Recovery bias: you are in a calm band. Close the day with a small cold ritual to protect it."
+        }
+        return "Recovery bias: cold is leading — keep hot work short and kind so energy returns without guilt."
     }
 
     struct WeeklyDayInsight: Identifiable {
@@ -465,6 +486,7 @@ final class HotColdViewModel: ObservableObject {
     // MARK: - Achievements
 
     private func evaluateAchievements() {
+        refreshEquilibriumPathCompletion()
         var next = unlockedAchievementIds
         if habits.count >= 1 { next.insert(AchievementID.firstHabit.rawValue) }
         if logs.contains(where: \.completed) { next.insert(AchievementID.firstCompletion.rawValue) }
@@ -509,6 +531,15 @@ final class HotColdViewModel: ObservableObject {
             next.insert(AchievementID.tenCompletionsOneDay.rawValue)
         }
 
+        let pathDone = EquilibriumProgramCatalog.levels.filter { completedEquilibriumLevelIds.contains($0.id) }.count
+        if pathDone >= 2 { next.insert(AchievementID.pathMilestone2.rawValue) }
+        if pathDone >= 4 { next.insert(AchievementID.pathMilestone4.rawValue) }
+        if pathDone >= EquilibriumProgramCatalog.levels.count { next.insert(AchievementID.pathComplete.rawValue) }
+
+        let academyRead = EquilibriumAcademyCatalog.lessons.filter { readAcademyLessonIds.contains($0.id) }.count
+        if academyRead >= 3 { next.insert(AchievementID.academyReader.rawValue) }
+        if academyRead >= EquilibriumAcademyCatalog.lessons.count { next.insert(AchievementID.academyGraduate.rawValue) }
+
         unlockedAchievementIds = next
     }
 
@@ -521,6 +552,124 @@ final class HotColdViewModel: ObservableObject {
         let hotC = dayLogs.filter { l in hotH.contains { $0.id == l.habitId } && l.completed }.count
         let coldC = dayLogs.filter { l in coldH.contains { $0.id == l.habitId } && l.completed }.count
         return DailyBalance(date: start, hotCompleted: hotC, coldCompleted: coldC, hotTotal: hotH.count, coldTotal: coldH.count)
+    }
+
+    // MARK: - Equilibrium Path & Academy
+
+    var sortedEquilibriumLevels: [EquilibriumLevelDefinition] {
+        EquilibriumProgramCatalog.levels.sorted { $0.order < $1.order }
+    }
+
+    func isEquilibriumLevelComplete(_ id: String) -> Bool {
+        completedEquilibriumLevelIds.contains(id)
+    }
+
+    func isEquilibriumLevelUnlocked(_ level: EquilibriumLevelDefinition) -> Bool {
+        let sorted = sortedEquilibriumLevels
+        guard let idx = sorted.firstIndex(where: { $0.id == level.id }) else { return false }
+        if idx == 0 { return true }
+        let prev = sorted[idx - 1]
+        return completedEquilibriumLevelIds.contains(prev.id)
+    }
+
+    var currentEquilibriumFocusLevel: EquilibriumLevelDefinition? {
+        sortedEquilibriumLevels.first { isEquilibriumLevelUnlocked($0) && !isEquilibriumLevelComplete($0.id) }
+    }
+
+    var equilibriumPathFullyComplete: Bool {
+        sortedEquilibriumLevels.allSatisfy { isEquilibriumLevelComplete($0.id) }
+    }
+
+    func setRhythmMode(_ mode: EquilibriumRhythmMode) {
+        rhythmMode = mode
+        evaluateAchievements()
+        saveToUserDefaults()
+    }
+
+    func markAcademyLessonRead(_ id: String) {
+        readAcademyLessonIds.insert(id)
+        evaluateAchievements()
+        saveToUserDefaults()
+    }
+
+    var academyReadCounts: (done: Int, total: Int) {
+        let total = EquilibriumAcademyCatalog.lessons.count
+        let done = EquilibriumAcademyCatalog.lessons.filter { readAcademyLessonIds.contains($0.id) }.count
+        return (done, total)
+    }
+
+    func equilibriumLevelGoalMetNow(_ level: EquilibriumLevelDefinition) -> Bool {
+        satisfiesEquilibriumCriterion(level.criterion)
+    }
+
+    private func refreshEquilibriumPathCompletion() {
+        let sorted = sortedEquilibriumLevels
+        var next = completedEquilibriumLevelIds
+        for level in sorted {
+            let prior = sorted.filter { $0.order < level.order }
+            let priorOk = prior.allSatisfy { next.contains($0.id) }
+            if !priorOk { break }
+            if next.contains(level.id) { continue }
+            if satisfiesEquilibriumCriterion(level.criterion) {
+                next.insert(level.id)
+            }
+        }
+        completedEquilibriumLevelIds = next
+    }
+
+    private func satisfiesEquilibriumCriterion(_ c: EquilibriumLevelCriterion) -> Bool {
+        switch c {
+        case let .anyCalendarDayMinHotCold(hot, cold):
+            return hasCalendarDayWithMinHotColdCompleted(hot: hot, cold: cold)
+        case let .consecutiveBalancedDays(count, maxAbs, minEach):
+            return consecutiveBalancedDaysStreak(maxAbsBalance: maxAbs, minEachSide: minEach) >= count
+        case let .lifetimeTotalCompletions(min):
+            return logs.filter(\.completed).count >= min
+        case let .minActiveHabitsNonArchived(hot, cold):
+            let hotN = habits.filter { $0.type == .hot && $0.isActive && !$0.isArchived }.count
+            let coldN = habits.filter { $0.type == .cold && $0.isActive && !$0.isArchived }.count
+            return hotN >= hot && coldN >= cold
+        case let .consecutiveDaysMinEachType(hotMin, coldMin, dayCount):
+            return hasTrailingDaysMinEachTypeEndingToday(hotMin: hotMin, coldMin: coldMin, dayCount: dayCount)
+        }
+    }
+
+    private func hasCalendarDayWithMinHotColdCompleted(hot: Int, cold: Int) -> Bool {
+        let cal = Calendar.current
+        let grouped = Dictionary(grouping: logs.filter(\.completed)) { cal.startOfDay(for: $0.date) }
+        for (_, dayLogs) in grouped {
+            let hotC = dayLogs.filter { habit(for: $0.habitId)?.type == .hot }.count
+            let coldC = dayLogs.filter { habit(for: $0.habitId)?.type == .cold }.count
+            if hotC >= hot, coldC >= cold { return true }
+        }
+        return false
+    }
+
+    private func consecutiveBalancedDaysStreak(maxAbsBalance: Int, minEachSide: Int) -> Int {
+        let cal = Calendar.current
+        var streak = 0
+        for offset in 0..<120 {
+            guard let d = cal.date(byAdding: .day, value: -offset, to: Date()) else { break }
+            let start = cal.startOfDay(for: d)
+            let b = dailyBalanceCached(on: start)
+            if b.hotCompleted >= minEachSide, b.coldCompleted >= minEachSide, abs(b.balanceScore) <= maxAbsBalance {
+                streak += 1
+            } else {
+                break
+            }
+        }
+        return streak
+    }
+
+    private func hasTrailingDaysMinEachTypeEndingToday(hotMin: Int, coldMin: Int, dayCount: Int) -> Bool {
+        let cal = Calendar.current
+        for offset in 0..<dayCount {
+            guard let d = cal.date(byAdding: .day, value: -offset, to: Date()) else { return false }
+            let start = cal.startOfDay(for: d)
+            let b = dailyBalanceCached(on: start)
+            if b.hotCompleted < hotMin || b.coldCompleted < coldMin { return false }
+        }
+        return true
     }
 
     // MARK: - Persistence
@@ -549,6 +698,13 @@ final class HotColdViewModel: ObservableObject {
         )
         if let encoded = try? JSONEncoder().encode(settings) {
             UserDefaults.standard.set(encoded, forKey: settingsKey)
+        }
+        UserDefaults.standard.set(rhythmMode.rawValue, forKey: rhythmModeKey)
+        if let encoded = try? JSONEncoder().encode(Array(completedEquilibriumLevelIds).sorted()) {
+            UserDefaults.standard.set(encoded, forKey: pathLevelsKey)
+        }
+        if let encoded = try? JSONEncoder().encode(Array(readAcademyLessonIds).sorted()) {
+            UserDefaults.standard.set(encoded, forKey: academyReadKey)
         }
     }
 
@@ -579,10 +735,23 @@ final class HotColdViewModel: ObservableObject {
             maxColdLeadBeforeWarning = s.maxColdLead
             habitSort = s.habitSort
         }
+        if let raw = UserDefaults.standard.string(forKey: rhythmModeKey),
+           let m = EquilibriumRhythmMode(rawValue: raw) {
+            rhythmMode = m
+        }
+        if let data = UserDefaults.standard.data(forKey: pathLevelsKey),
+           let arr = try? JSONDecoder().decode([String].self, from: data) {
+            completedEquilibriumLevelIds = Set(arr)
+        }
+        if let data = UserDefaults.standard.data(forKey: academyReadKey),
+           let arr = try? JSONDecoder().decode([String].self, from: data) {
+            readAcademyLessonIds = Set(arr)
+        }
         if habits.isEmpty {
             loadDemoData()
         }
         evaluateAchievements()
+        saveToUserDefaults()
     }
 
     private func loadDemoData() {

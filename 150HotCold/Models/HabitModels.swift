@@ -250,6 +250,11 @@ enum AchievementID: String, CaseIterable, Codable {
     case usageStreak7 = "usage_streak_7"
     case tenHabits = "ten_habits"
     case tenCompletionsOneDay = "ten_one_day"
+    case pathMilestone2 = "path_milestone_2"
+    case pathMilestone4 = "path_milestone_4"
+    case pathComplete = "path_complete"
+    case academyReader = "academy_reader"
+    case academyGraduate = "academy_graduate"
 
     var title: String {
         switch self {
@@ -262,6 +267,11 @@ enum AchievementID: String, CaseIterable, Codable {
         case .usageStreak7: return "Week of focus"
         case .tenHabits: return "Collector"
         case .tenCompletionsOneDay: return "Power day"
+        case .pathMilestone2: return "Path · twin rails"
+        case .pathMilestone4: return "Path · quartet"
+        case .pathComplete: return "Path · seven strip"
+        case .academyReader: return "Academy reader"
+        case .academyGraduate: return "Academy graduate"
         }
     }
 
@@ -276,6 +286,11 @@ enum AchievementID: String, CaseIterable, Codable {
         case .usageStreak7: return "7-day activity streak (half+ habits done)."
         case .tenHabits: return "Have 10 habits in the app (any state)."
         case .tenCompletionsOneDay: return "Complete 10 habits in a single day."
+        case .pathMilestone2: return "Finish the first two Equilibrium Path levels."
+        case .pathMilestone4: return "Finish the first four Equilibrium Path levels."
+        case .pathComplete: return "Finish all five Equilibrium Path levels."
+        case .academyReader: return "Read three Academy lessons to the end."
+        case .academyGraduate: return "Read every Academy lesson."
         }
     }
 
@@ -290,6 +305,11 @@ enum AchievementID: String, CaseIterable, Codable {
         case .usageStreak7: return "flame.circle.fill"
         case .tenHabits: return "square.grid.3x3.fill"
         case .tenCompletionsOneDay: return "sparkles"
+        case .pathMilestone2: return "point.3.connected.trianglepath.dotted"
+        case .pathMilestone4: return "square.grid.2x2.fill"
+        case .pathComplete: return "seal.fill"
+        case .academyReader: return "book.fill"
+        case .academyGraduate: return "graduationcap.fill"
         }
     }
 }

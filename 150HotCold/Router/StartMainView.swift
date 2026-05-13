@@ -1,13 +1,9 @@
 //
 //  StartMainView.swift
-//  101RoastLog
-//
-//  Created by Ethit Hu on 19.03.2026.
+//  150HotCold
 //
 
 import SwiftUI
-
-// MARK: - Two rotating segments loader (example style)
 
 struct NewLoadTwoCircleView: View {
     var progress: Double
@@ -110,18 +106,14 @@ struct EndLoadingIndicator: View {
     }
 }
 
-// MARK: - Start Main View
-
-struct StartMainView: View {
+struct HCLaunchGateView: View {
     var body: some View {
         ZStack {
-            // Background image
             Image(.werd)
                 .resizable()
                 .aspectRatio(contentMode: .fill)
                 .ignoresSafeArea()
 
-            // Dark overlay for contrast and text readability
             LinearGradient(
                 colors: [
                     Color.black.opacity(0.35),
@@ -150,5 +142,5 @@ struct StartMainView: View {
 }
 
 #Preview {
-    StartMainView()
+    HCLaunchGateView()
 }

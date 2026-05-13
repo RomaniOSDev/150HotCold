@@ -52,11 +52,17 @@ struct ContentView: View {
                 }
                 .tag(4)
 
+            ProgramHubView(viewModel: viewModel)
+                .tabItem {
+                    Label("Program", systemImage: "book.pages.fill")
+                }
+                .tag(5)
+
             SettingsView()
                 .tabItem {
                     Label("Settings", systemImage: "gearshape.fill")
                 }
-                .tag(5)
+                .tag(6)
         }
         .tint(.hcHot)
         .preferredColorScheme(.dark)

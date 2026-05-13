@@ -5,20 +5,19 @@
 //  Created by Roman on 5/3/26.
 //
 
-import UIKit
 import SwiftUI
+import UIKit
 
 class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
     var window: UIWindow?
-    private var appRouter: AppRouter?
-
+    private var rootFlowCoordinator: HCApplicationFlowCoordinator?
 
     func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
         guard let windowScene = (scene as? UIWindowScene) else { return }
         window = UIWindow(windowScene: windowScene)
-        appRouter = AppRouter()
-        window?.rootViewController = appRouter?.initialViewController()
+        rootFlowCoordinator = HCApplicationFlowCoordinator()
+        window?.rootViewController = rootFlowCoordinator?.makeRootInterface()
         window?.makeKeyAndVisible()
     }
 
@@ -50,6 +49,4 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         // to restore the scene back to its current state.
     }
 
-
 }
-
